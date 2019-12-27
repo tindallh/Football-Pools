@@ -6,6 +6,7 @@ Sources for the Football-pools.org Website
    version 18.01
    first written: 15 Aug 2004
    last modified:
+<pre>
  Version 19.01 - 23 Sep 2019 - fixed pop-up schedule error for Neutral
                  site.
          18.01 - 11 Sep 2018 - new versioning to coincide with season,
@@ -106,3 +107,4 @@ Sources for the Football-pools.org Website
                  over multiple years.
           1.01 - 28 Nov 2004 - added performance graphs
           1.00 - 15 Aug 2004 - Initial Release
+</pre>
