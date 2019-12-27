@@ -1,11 +1,13 @@
-# Football-Pools
-Sources for the Football-pools.org Website
-/*****************************************************************************/
- Football Pool module for PHP-Nuke
-   written by: Henry B. Tindall, Jr.
-   version 18.01
-   first written: 15 Aug 2004
-   last modified:
+# Football-Pools<br>
+Sources for the Football-pools.org Website,<br><br>
+Football Pool module for PHP-Nuke and associated files.<br>
+Some files may be originally included in PHP-Nuke, included here for dependencies or having been modified for a specific reason, as in the case of the "Your_account" module.<br>
+Football Pools module written by: Henry B. Tindall, Jr.<br>
+Current version 19.01<br>
+first written: 15 Aug 2004<br>
+last modified: 23 Sep 2019<br>
+<br>
+Current plan is to re-write the entire conglomeration of scripts after re-creating the database in a more sensible, normalized manner.  At this point the CMS of choice is looking to be Drupal, but open to suggestion with appropriate rationale.<br>
 <pre>
  Version 19.01 - 23 Sep 2019 - fixed pop-up schedule error for Neutral
                  site.
