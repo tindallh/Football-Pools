@@ -1,0 +1,535 @@
+<?php
+/*****************************************************************************/
+/* College Pool module for PHP-Nuke                                          */
+/*   written by: Henry B. Tindall, Jr.                                       */
+/*   version 0.90 (beta)                                                     */
+/*   first written: 15 Aug 2004                                              */
+/*   last modified: 26 Aug 2004                                              */
+/*                                                                           */
+/* Changelog:                                                                */
+/*  version 0.90 - 15 Aug 2004 - Initial release.                            */
+/*          0.95 - 26 Aug 2004 - Added code to colorize previous weeks'      */
+/*                               "All picks" listing by whether or not the   */
+/*                               pick was correct.                           */
+/*****************************************************************************/
+
+ob_start('ob_gzhandler');
+
+if (!eregi("modules.php", $_SERVER['SCRIPT_NAME'])) {
+    die ("You can't access this file directly...");
+}
+
+require_once("mainfile.php");
+$module_name = basename(dirname(__FILE__));
+get_lang($module_name);
+if (is_user($user)) {
+	cookiedecode($user);
+	$uname = $cookie[1];
+	$result = $db->sql_query("SELECT user_id FROM ".$user_prefix."_users WHERE username='$uname'");
+	$row = $db->sql_fetchrow($result);
+	$user_id = intval($row[user_id]);
+}
+$pagetitle = "- The Pools";
+include ('header.php');
+$today_date = date("Y-m-d");
+$disp_date = date("l, j F, Y");
+echo "<center>Today's Date: $disp_date";
+
+if (isset($weekID)) {
+	$weekID = intval($weekID);
+} else {
+	$result = $db->sql_query("SELECT week,date FROM ".$prefix."_games where date > '$today_date' order by week, date limit 1");
+	$object = sql_fetch_object($result, $dbi);
+	if(is_object($object)) {
+		$weekID = $object->week;
+		$weekID = intval($weekID);
+		$date = $object->date;
+		$lastweek = $weekID-1;
+		$lastweek = intval($lastweek);
+		echo " - The next picks are due <b>before</b> $date!</center><br>\n";
+	}	else {
+		$result = $db->sql_query("SELECT week,date FROM ".$prefix."_games order by week DESC limit 1");
+		$object = sql_fetch_object($result, $dbi);
+		if(is_object($object)) {
+			$weekID = $object->week;
+			$weekID = intval($weekID);
+			$lastweek=$weekID;
+			$sweekID = $weekID;
+		}
+		$seasonover = 1;
+		echo "<center><font size=+5>Sorry, the season is over.  Join us on the forums, or check out the all the results.</font></center>";
+	}
+} 
+if ($op == "MakePicks") {
+	DisplayWeek($weekID);
+} elseif ($op == "ScoresLast") {
+	DisplayWeek($lastweek);
+} elseif ($op == "Schedule") {
+	Schedule();
+} elseif ($op == "SavePicks") {
+	SavePicks();
+} elseif ($op == "WinnersWeek") {
+	WinnersWeek($lastweek);
+} elseif ($op == "WinnersAll") {
+	WinnersAll($weekID);
+} elseif ($op == "ShowAllPicks") {
+	ShowAllPicks($weekID,$start_user);
+} elseif ($op == "DisplayWeek") {
+	DisplayWeek($sweekID);
+}
+
+if ($op != "MakePicks") { $boxContent .= "<font class=\"content\"><a href=\"modules.php?name=$module_name&amp;op=MakePicks\"><b><i>Make my Picks !</i></b></a></font><br>\n";}
+if ($op != "ShowAllPicks") { $boxContent .= "<font class=\"content\"><a href=\"modules.php?name=$module_name&amp;op=ShowAllPicks&amp;weekID=$weekID&amp;start_user=1\"><b>Everyone's Picks</b></a></font><br>\n";}
+if ($op != "ShowScores" && $sweekID > 0) { $boxContent .= "<font class=\"content\"><a href=\"modules.php?name=$module_name&amp;op=DisplayWeek&amp;sweekID=$lastweek\"><b>Last Week's Scores</b></a></font><br>\n";}
+if ($op != "Schedule") { $boxContent .= "<font class=\"content\"><a href=\"modules.php?name=$module_name&amp;op=Schedule\"><b>Full Schedule</b></a></font><br>\n";}
+if ($op != "WinnersWeek") { $boxContent .= "<font class=\"content\"><a href=\"modules.php?name=$module_name&amp;op=WinnersWeek&amp;sweekID=$lastweek\"><b>Last Week's winners</b></a></font><br>\n";}
+if ($op != "WinnersAll") { $boxContent .= "<font class=\"content\"><a href=\"modules.php?name=$module_name&amp;op=WinnersAll\"><b>Overall winners</b></a></font><br>\n";}
+if ($op) { $boxContent .= "<br><font class=\"content\"><a href=\"modules.php?name=$module_name\"><b>Go to main Pool page</b></a></font><br>\n";}
+themecenterbox($boxTitle, $boxContent);
+
+include ('footer.php');
+
+/*********************************************************/
+/* Functions                                             */
+/*********************************************************/
+
+function Schedule() {
+	global $weekID, $boxTitle, $boxContent, $user, $user_id, $uname, $cookie, $prefix, $dbi, $module_name, $db;
+	$boxTitle = "Schedule";
+	$boxContent .= "<table border=\"0\" cellpadding=\"4\">";
+	$result = $db->sql_query("SELECT week,count(*) 'count',date FROM ".$prefix."_games GROUP BY week");
+	while ($row = $db->sql_fetchrow($result)) {
+		$f_date = $row['date'];
+		$f_week = $row['week'];
+		$gcount = $row['count'];
+		$boxContent .= "<tr><td><a href=\"modules.php?name=$module_name&amp;op=DisplayWeek&amp;sweekID=".$f_week."\">Week $f_week</a></td><td align=\"right\">$gcount games, first game on $f_date</td>";
+		if ($f_week < $weekID) {
+			$boxContent .= "<td><a href=\"modules.php?name=$module_name&amp;op=WinnersWeek&amp;sweekID=".$f_week."\">Winners</a></td>";
+			$boxContent .= "<td><a href=\"modules.php?name=$module_name&amp;op=ShowAllPicks&amp;weekID=".$f_week."&amp;start_user=1\">Show Picks</a></td>";
+		}
+		$boxContent .= "</tr>\n";
+	}
+	$boxContent .= "</table><br><br>\n";
+}
+
+function SavePicks() {
+	global $weekID, $boxTitle, $boxContent, $user, $user_id, $uname, $cookie, $prefix, $dbi, $module_name, $db;
+	$today_date = date("Y-m-d");
+	if (is_user($user)) {
+		getusrinfo($user);
+		cookiedecode($user);
+	}
+	$boxTitle = "$uname's week $weekID Picks Submission";
+	$result_b = sql_query("SELECT game, pick FROM ".$prefix."_picks WHERE week='$weekID' AND user_id = '$user_id' order by game", $dbi);
+	while ($row = $db->sql_fetchrow($result_b)) {
+		$db_game = intval($row['game']);
+		$db_pick[$db_game] = $row['pick'];
+	}
+	$count=0;
+	$result = $db->sql_query("SELECT date, home, home_score, visitor, visitor_score, home_spread, game FROM ".$prefix."_games WHERE week='$weekID' ORDER by date,game", $dbi);
+	while ($row = $db->sql_fetchrow($result)) {
+		$count++;
+		$game = intval($row['game']);
+		$date[$game] = $row['date'];
+		$day = date("l", strtotime($date[$game]));
+		$gid[$game] = $game;
+		$home[$game] = $row['home'];
+		$visitor[$game] = $row['visitor'];
+		$home_spread[$game] = $row['home_spread'];
+	}
+	foreach ($gid as $game) {
+		$pickval[$game] = $_POST[$game];
+		/* here's a handy tool */
+		(($pickval[$game] == "home") ? $choice = $home[$game] : $choice = $visitor[$game] );
+		(($pickval[$game] == "home") ? $nonchoice = $visitor[$game] : $nonchoice = $home[$game] );
+		if ($date[$game] > $today_date) {
+			if (($pickval[$game] == "home" ) || ($pickval[$game] == "visitor" )) {
+				$boxContent .= "<b>$choice</b> over <b>$nonchoice</b>";
+				if ((($db_pick[$game] == "home") || ($db_pick[$game] == "visitor")) && ($db_pick[$game] != $pickval[$game])) {
+					$update = $db->sql_query("UPDATE ".$prefix."_picks SET pick = '$pickval[$game]' WHERE (user_id = '$user_id' AND week = '$weekID' AND game = '$game')", $dbi);
+					$boxContent .= " (changed)<br>\n";
+				} elseif (($db_pick[$game] != "home") && ($db_pick[$game] != "visitor")) {
+					$insert = $db->sql_query("INSERT INTO ".$prefix."_picks (user_ID, week, game, pick) VALUES ('$user_id', '$weekID', '$game', '$pickval[$game]')", $dbi);
+					$boxContent .= " (added)<br>\n";
+				} else {
+					$boxContent .= "<br>\n";
+				}
+			}
+		} else {
+			$boxContent .= "<i>Sorry, you're too late to add/change the pick for $visitor[$game] at $home[$game].<br>\n";
+		}
+	}
+	$boxContent .= "<br>Thanks for the picks, $uname.<br>";
+	$boxContent .= "If you change your mind, you can ";
+	$boxContent .= "go back and change any of your picks up through the day before that particular game...<br>";
+	$boxContent .= "You'll see your old picks already filled in on the form if you go back and refresh it.<br><br><br>\n";
+}
+
+function WinnersWeek($sweekID) {
+	global $user_prefix, $weekID, $boxTitle, $boxContent, $user, $user_id, $uname, $cookie, $prefix, $dbi, $module_name, $db;
+	$numweeks = 0;
+	$result_b = sql_query("SELECT user_id, game, pick FROM ".$prefix."_picks WHERE week='$sweekID'", $dbi);
+	while ($row = $db->sql_fetchrow($result_b)) {
+		$uid = intval($row['user_id']);
+		$db_game = intval($row['game']);
+		$db_pick[$uid][$db_game] = $row['pick'];
+		$numweeks++;
+	}
+	if ($numweeks > 0) {
+		$result = sql_query("SELECT user_id, username FROM ".$user_prefix."_users WHERE user_id > 1 ORDER BY user_id", $dbi);
+		while ($row = $db->sql_fetchrow($result)) {
+			$db_id = intval($row['user_id']);
+			$db_user[$db_id] = $row['username'];
+			$db_uid[$db_user[$db_id]] = $db_id;
+		}
+		$gameresults = sql_query("SELECT home_score, visitor_score, home_spread, game FROM ".$prefix."_games WHERE week='$sweekID' ORDER by date,game", $dbi);
+		while ($row = $db->sql_fetchrow($gameresults)) {
+			$g_game = intval($row['game']);
+			$w_game[$g_game] = $g_game;
+			$g_home_score = $row['home_score'];
+			$g_visitor_score = $row['visitor_score'];
+			$g_home_spread = $row['home_spread'];
+			if (( $g_home_score > 0 ) or ($g_visitor_score > 0)) {
+				$g_result = ($g_home_score - $g_visitor_score) - $g_home_spread;
+			} else {
+				$g_result = 0;
+			}
+			if ($g_result > 0) {
+				$g_winner[$weekID][$g_game] = "home";
+			} elseif ($g_result < 0) {
+				$g_winner[$weekID][$g_game] = "visitor";
+			} else {
+				$g_winner[$weekID][$g_game] = "none";
+			}
+		}
+		foreach ($db_uid as $usernum) {
+			foreach ($w_game as $g_num) {
+				if (( $db_pick[$usernum][$g_num] == "home" ) || ( $db_pick[$usernum][$g_num] == "visitor" )) {
+					if ($g_winner[$weekID][$g_num] == $db_pick[$usernum][$g_num]) {
+						$right[$weekID][$usernum]++;
+					} elseif ($g_winner[$weekID][$g_num] == "none") {
+						$push[$weekID][$usernum]++;
+					} else {
+						$wrong[$weekID][$usernum]++;
+					}
+				}
+			}
+			if (($right[$weekID][$usernum] + $wrong[$weekID][$usernum]) > 0) {
+				$pct[$usernum] = $right[$weekID][$usernum] / ($right[$weekID][$usernum] + $wrong[$weekID][$usernum]);
+			} else {
+			  $pct[$usernum] = 0;
+			 }
+			if (!($right[$weekID][$usernum])) { $right[$weekID][$usernum] = 0; }
+			if (!($wrong[$weekID][$usernum])) { $wrong[$weekID][$usernum] = 0; }
+		}
+		arsort($pct);
+		$i = 1;
+		foreach ($pct as $picker => $pick_pct ) {
+			if ($i == 1) {
+				$bigwinner = $db_user[$picker];
+				$bigpct = strval(number_format($pick_pct, 3));
+			} else {
+				if (strval(number_format($pick_pct, 3)) === $bigpct) {
+					$bigwinner .= ", ".$db_user[$picker];
+				}
+			}	
+			$i++;
+		}
+		$boxContent .= "<h3>Last Week's big winner:</h3><h2>$bigwinner</h2><h3>with a percentage of $bigpct !</h3>\n";
+		$boxContent .= "<table>\n";
+		$boxContent .= "<tr><td></td><td><b>record</b></td><td><b>percentage</b></td></tr>\n";
+		foreach ($pct as $picker => $pick_pct ) {
+			$boxContent .= "<tr><td><b>".$db_user[$picker]."</b></td><td align=\"center\">".$right[$weekID][$picker];
+			$boxContent .= " - ".$wrong[$weekID][$picker]."</td><td align=\"center\">".number_format($pick_pct, 3)."</td></tr>\n";
+		}
+		$boxContent .= "</table><br><br>\n";
+	} else {
+		$boxContent .= "<h4>Sorry, There are no results to display yet.  Check back next week....</h4>\n";
+	}
+}
+
+function WinnersAll($weekID) {
+	global $user_prefix, $weekID, $lastweek, $boxTitle, $boxContent, $user, $user_id, $uname, $cookie, $prefix, $dbi, $module_name, $db;
+	$numweeks = 0;
+	$result_b = sql_query("SELECT user_id, game, pick, week FROM ".$prefix."_picks WHERE week < $weekID", $dbi);
+	while ($row = $db->sql_fetchrow($result_b)) {
+		$db_week = intval($row['week']);
+		$uid = intval($row['user_id']);
+		$db_game = intval($row['game']);
+		$db_pick[$db_week][$uid][$db_game] = $row['pick'];
+		$numweeks++;
+	}
+	if ($numweeks > 0) {
+		$result = sql_query("SELECT user_id, username FROM ".$user_prefix."_users WHERE user_id > 1 ORDER BY user_id", $dbi);
+		while ($row = $db->sql_fetchrow($result)) {
+			$db_id = intval($row['user_id']);
+			$db_user[$db_id] = $row['username'];
+			$db_uid[$db_user[$db_id]] = $db_id;
+		}
+		$gameresults = sql_query("SELECT home_score, visitor_score, home_spread, week, game FROM ".$prefix."_games WHERE week < '$weekID' ORDER by week, date, game", $dbi);
+		while ($row = $db->sql_fetchrow($gameresults)) {
+			$g_week = intval($row['week']);
+			$r_week[$g_week] = $g_week;
+			$g_game = intval($row['game']);
+			$w_game[$g_game] = $g_game;
+			$g_home_score = $row['home_score'];
+			$g_visitor_score = $row['visitor_score'];
+			$g_home_spread = $row['home_spread'];
+			if (( $g_home_score > 0 ) or ($g_visitor_score > 0)) {
+				$g_result = ($g_home_score - $g_visitor_score) - $g_home_spread;
+			} else {
+				$g_result = 0;
+			}
+			if ($g_result > 0) {
+				$g_winner[$g_week][$g_game] = "home";
+			} elseif ($g_result < 0) {
+				$g_winner[$g_week][$g_game] = "visitor";
+			} else {
+				$g_winner[$g_week][$g_game] = "none";
+			}
+		}
+		foreach ($db_uid as $usernum) {
+			foreach ($r_week as $rweek) {
+				foreach ($w_game as $g_num) {
+					if (( $db_pick[$rweek][$usernum][$g_num] == "home" ) || ( $db_pick[$rweek][$usernum][$g_num] == "visitor" )) {
+						if ($g_winner[$rweek][$g_num] == $db_pick[$rweek][$usernum][$g_num]) {
+							$right[$rweek][$usernum]++;
+							$t_right[$usernum]++;
+						} elseif ($g_winner[$rweek][$g_num] == "none") {
+							$push[$rweek][$usernum]++;
+						} else {
+							$wrong[$rweek][$usernum]++;
+							$t_wrong[$usernum]++;
+						}
+					}
+				}
+				if (!($right[$rweek][$usernum])) { $right[$rweek][$usernum] = 0; }
+				if (!($wrong[$rweek][$usernum])) { $wrong[$rweek][$usernum] = 0; }
+			}
+			if (!($t_right[$usernum])) { $t_right[$usernum] = 0; }
+			if (!($t_wrong[$usernum])) { $t_wrong[$usernum] = 0; }
+			if (($t_right[$usernum] + $t_wrong[$usernum]) > 0) {
+				$pct[$usernum] = $t_right[$usernum] / ($t_right[$usernum] + $t_wrong[$usernum]);
+			} else {
+			  $pct[$usernum] = 0;
+			}
+		}
+		arsort($pct);
+		$i = 1;
+		foreach ($pct as $picker => $pick_pct ) {
+			if ($i == 1) {
+				$bigwinner = $db_user[$picker];
+				$bigpct = number_format($pick_pct, 3);
+			} else {
+				if (strval(number_format($pick_pct, 3)) === $bigpct) {
+					$bigwinner .= ", ".$db_user[$picker];
+				}
+			}	
+			$i++;
+		}
+		$boxContent .= "<h2>The overall ". (($seasonover == 1 ) ? "winner" : "leader")." is $bigwinner, with a percentage of $bigpct !</h2>\n";
+		$boxContent .= "<table>\n";
+		$boxContent .= "<tr><td></td><td align=\"center\"><b>Overall<br>record</b></td><td align=\"center\"><b>Overall<br>percentage</b></td>";
+		foreach ($r_week as $rweek) {
+			$boxContent .= "<td align=\"center\">&nbsp;&nbsp;week&nbsp;&nbsp;<br>$rweek</td>";
+		}
+		$boxContent .= "</tr>\n";
+		foreach ($pct as $picker => $pick_pct ) {
+			$boxContent .= "<tr><td><b>".$db_user[$picker]."</b></td><td align=\"center\">".$t_right[$picker]." - ".$t_wrong[$picker]."</td>";
+			$boxContent .= "<td align=\"center\">".number_format($pick_pct, 3)."</td>";
+			foreach ($r_week as $rweek) {
+				$boxContent .= "<td align=\"center\">".$right[$rweek][$picker]." - ".$wrong[$rweek][$picker]."</td>";
+			}
+			$boxContent .= "</tr>\n";
+		}
+		$boxContent .= "</table><br><br>\n";
+	} else {
+		$boxContent .= "<h4>Sorry, There are no results to display yet.  Check back next week....</h4>\n";
+	}
+}
+
+function ShowAllPicks($weekID,$start_user) {
+	global $tot_users, $user_prefix, $weekID, $start_user, $boxTitle, $boxContent, $cookie, $prefix, $dbi, $module_name, $db;
+	$boxTitle = "Everyone's picks";
+	$grabusertot = sql_query("SELECT user_id, username FROM ".$user_prefix."_users WHERE user_id > 1 ORDER BY user_id", $dbi);
+	$tot_users = 0;
+	while ($row = $db->sql_fetchrow($grabusertot)) {
+		$db_id = intval($row['user_id']);
+		$db_user[$db_id] = $row['username'];
+		$tot_users++;
+		$realName[$tot_users] = $row['username'];
+		$realID[$tot_users] =  $db_id;
+		$userIDX[$db_id] = $tot_users;
+	}
+	if ($tot_users > $start_user+5) {
+		$end_user = $start_user+5;
+		$moreusers = "true"; 
+	} elseif ($tot_users >= $start_user) {
+		$end_user = $tot_users;
+		$moreusers = "false";
+	}
+	$result_b = sql_query("SELECT user_id, game, pick FROM ".$prefix."_picks WHERE week='$weekID'", $dbi);
+	while ($row = $db->sql_fetchrow($result_b)) {
+		$db_game = intval($row['game']);
+		$IDX = $userIDX[intval($row['user_id'])];
+		$db_pick[$IDX][$db_game] = $row['pick'];
+	}
+	$gameresults = sql_query("SELECT home, home_score, visitor, visitor_score, home_spread, game FROM ".$prefix."_games WHERE week = '$weekID' ORDER by date, game", $dbi);
+	while ($row = $db->sql_fetchrow($gameresults)) {
+		$d_gid = intval($row['game']);
+		$d_game[$d_gid] = $d_gid;
+		$d_home[$d_gid] = $row['home'];
+		$d_visitor[$d_gid] = $row['visitor'];
+		$d_home_score[$d_gid] = $row['home_score'];
+		$d_visitor_score[$d_gid] = $row['visitor_score'];
+		$d_home_spread[$d_gid] = $row['home_spread'];
+		$g_result[$d_gid] = ($d_home_score[$d_gid] - $d_visitor_score[$d_gid]) - $d_home_spread[$d_gid];
+	}
+	$boxContent .= "<center><table cellpadding=\"2\">\n<tr><td></td>";
+	for ($i = $start_user; $i <= $end_user; $i++) { $boxContent .= "<td align=\"center\"><b>".$realName[$i]."</b></td>"; }
+	$boxContent .= "</tr>\n";
+	foreach ($d_game as $g_num) {
+		if ($d_home_spread[$g_num]) {
+			if (!(($d_home_score[$g_num] > 0) || ($d_visitor_score[$g_num] > 0))) { $g_result[$g_num] = 0; }
+			$boxContent .= "<tr><td nowrap><center>".$d_visitor[$g_num]."<br>at<br>".$d_home[$g_num]." (".$d_home_spread[$g_num].")</center></td>";
+			for ($i = $start_user; $i <= $end_user; $i++) {
+				if (( $db_pick[$i][$g_num] == "home" ) || ( $db_pick[$i][$g_num] == "visitor" )) {
+					if ($db_pick[$i][$g_num] == "home") {
+						$pick = $d_home[$g_num];
+						if ($g_result[$g_num] > 0) { 
+							$boxContent .= "<td align=\"center\" valign=\"center\" bgcolor=lightgreen><b>$pick</b></td>";
+						} elseif ($g_result[$g_num] < 0) {
+							$boxContent .= "<td align=\"center\" valign=\"center\" bgcolor=red><b>$pick</b></td>";
+						} else {
+							$boxContent .= "<td align=\"center\" valign=\"center\"><b>$pick</b></td>";
+						}
+					} else {
+						$pick = $d_visitor[$g_num];
+						if ($g_result[$g_num] < 0) { 
+							$boxContent .= "<td align=\"center\" valign=\"center\" bgcolor=lightgreen><b>$pick</b></td>";
+						} elseif ($g_result[$g_num] > 0)  {
+							$boxContent .= "<td align=\"center\" valign=\"center\" bgcolor=red><b>$pick</b></td>";
+						} else { 
+							$boxContent .= "<td align=\"center\" valign=\"center\"><b>$pick</b></td>";
+						} 
+					}
+				} else {
+					$boxContent .= "<td align=\"center\" valign=\"center\"><i>no pick</i></td>";
+				}
+			}
+			$boxContent .= "</tr>\n<tr><td colspan=\"8\"><hr></td></tr>\n";
+		}
+	}
+	$boxContent .= "</table></center><br><br>\n";
+	if ($start_user > 6) {
+		$prev_start_user = $start_user-6;
+		$boxContent .= "<center><font class=\"content\"><a href=\"modules.php?name=$module_name&amp;op=ShowAllPicks&amp;weekID=$weekID&amp;start_user=$prev_start_user\"><b>Previous 6 Players</b></a></font></center>\n";
+	}
+	if ($moreusers == "true" ) {
+		$start_user = $start_user+6;
+		$boxContent .= "<center><font class=\"content\"><a href=\"modules.php?name=$module_name&amp;op=ShowAllPicks&amp;weekID=$weekID&amp;start_user=$start_user\"><b>Next 6 Players</b></a></font></center><br>\n";
+	}
+}
+
+function DisplayWeek($sweekID) {
+	global $boxTitle, $boxContent, $user, $user_id, $uname, $cookie, $prefix, $dbi, $module_name, $db, $seasonover;
+	$today_date = date("Y-m-d");
+	if ($seasonover == 1) {
+		$boxContent .= "<h3>Sorry, the season is over.  Come back next fall for more fun...</h3>\n";
+	} else {
+		$boxTitle = "$uname's picks";
+		$boxContent .= "<form action=\"modules.php?name=$module_name&amp;op=SavePicks\" method=\"post\">";
+		$boxContent .= "<input type=\"hidden\" name=\"weekID\" value=\"".$sweekID."\">";
+		$boxContent .= "<center><h3>Week $sweekID</h3></center><hr>\n";
+		$boxContent .= "<table border=\"0\" cellpadding=\"2\" cellspacing=\"2\" width=\"100%\">";
+		unset ($db_hi);
+		$result_b = sql_query("SELECT game, pick FROM ".$prefix."_picks WHERE week='$sweekID' AND user_id = '$user_id' order by game", $dbi);
+		while ($row = $db->sql_fetchrow($result_b)) {
+			$db_game = $row['game'];
+			$db_pick = $row['pick'];
+			$db_hi[$db_game][$db_pick] = true;
+		}
+		$gamestopick=0;
+		$gamesfrozen=0;
+		$withoutspreads=0;
+		$finishedgames=0;
+		$result = sql_query("SELECT date, home, home_score, visitor, visitor_score, home_spread, game FROM ".$prefix."_games WHERE week='$sweekID' ORDER by date,game", $dbi);
+		while ($row = $db->sql_fetchrow($result)) {
+			$game = $row['game'];
+			$date[$game] = $row['date'];
+			$day = date("l", strtotime($date[$game]));
+			$home = $row['home'];
+			$visitor = $row['visitor'];
+			$home_score = $row['home_score'];
+			$visitor_score = $row['visitor_score'];
+			$home_spread = $row['home_spread'];
+			if (!(($home_score > 0) || ($visitor_score > 0))) {
+				if ($date[$game] > $today_date) { 
+					if ($home_spread > 0 || $home_spread < 0) {
+						$gamestopick++ ;
+						$boxContent .= "<tr><td>$date[$game]</td><td><input type=\"radio\" name=\"$game\" VALUE=\"visitor\"".($db_hi[$game]['visitor'] ? ' checked' : '')."></td><td><font class=\"content\">$visitor</font></td></tr>\n";
+						$boxContent .= "<tr><td>$day</td><td><input type=\"radio\" name=\"$game\" VALUE=\"home\"".($db_hi[$game]['home'] ? ' checked' : '')."></td><td><font class=\"content\">at $home</font></td><td><font class=\"content\"><i>($home_spread)</i></font></td></tr>\n";
+						$boxContent .= "<tr><td colspan=\"5\"><hr></td></tr>\n";
+					} else {
+					 	$withoutspreads++ ;
+						$boxContent .= "<tr><td>$date[$game]</td><td></td><td><font class=\"content\">$visitor</font></td></tr>\n";
+						$boxContent .= "<tr><td>$day</td><td></td><td><font class=\"content\">at $home</font></td><td></td></tr>\n";
+						$boxContent .= "<tr><td colspan=\"5\"><hr></td></tr>\n";
+					}
+				} else {
+					$gamesfrozen++ ;
+					$boxContent .= "<tr><td>$date[$game]</td><td>".($db_hi[$game]['visitor'] ? '*' : '')."</td><td><font class=\"content\">$visitor</font></td></tr>\n";
+					$boxContent .= "<tr><td>$day</td><td>".($db_hi[$game]['home'] ? '*' : '')."</td><td><font class=\"content\">at $home</font></td><td></td></tr>\n";
+					$boxContent .= "<tr><td colspan=\"5\"><hr></td></tr>\n";
+				}
+			} else {
+				$finishedgames++ ;
+				$g_result = ($home_score - $visitor_score) - $home_spread;
+				if ($g_result > 0) {
+					$hbh="<b>";
+					$heh="</b>";
+					$vbh="";
+					$veh="";
+				} elseif ($g_result < 0) {
+					$hbh="";
+					$heh="";
+					$vbh="<b>";
+					$veh="</b>";
+				}	else {
+					$hbh="";
+					$heh="";
+					$vbh="";
+					$veh="";
+				}
+				((($g_result > 0) && $db_hi[$game]['home']) ? $hbgs = ' bgcolor=lightgreen' : $hbgs = '') ;
+				((($g_result < 0) && $db_hi[$game]['home']) ? $hbgs = ' bgcolor=red' : $hbgs = '') ;
+				((($g_result < 0) && $db_hi[$game]['visitor']) ? $vbgs = ' bgcolor=lightgreen' : $vbgs = '') ;
+				((($g_result > 0) && $db_hi[$game]['visitor']) ? $vbgs = ' bgcolor=red' : $hbgs = '') ;
+				$boxContent .= "<tr><td>$date[$game]</td><td>".$vbh."<font class=\"content\">$visitor_score</font>".$veh."</td><td".$vbgs.">".$vbh."<font class=\"content\">$visitor</font>".$veh."</td></tr>\n";
+				$boxContent .= "<tr><td>$day</td><td>".$hbh."<font class=\"content\">$home_score</font>".$heh."</td><td".$hbgs.">".$hbh."<font class=\"content\">at $home</font>".$heh."</td><td><font class=\"content\"><i>($home_spread)</i></font></td></tr>\n";
+				$boxContent .= "<tr><td colspan=\"5\"><hr></td></tr>\n";
+			}
+		}
+		$boxContent .= "</table><br><center>\n";
+		if ($gamestopick > 0) {
+			$boxContent .= "<input type=\"submit\" VALUE=\"Submit\">\n";
+			$boxContent .= "</center></form><br>\n";
+			$boxContent .= "If you change your mind, you can ";
+			$boxContent .= "come back and change any of your picks up through the day before that particular game...<br>";
+			$boxContent .= "Once you've saved a choice, it'll be filled in on the form when you bring it up.<br><br><br>\n";
+		} else {
+			$boxContent .= "</center></form><br>\n";
+		}
+		if ($finishedgames > 0) {
+			$boxContent .= "<tr><td colspan=10><i>Winning teams against the spread are in </i><b>bold</b><i>, your picks are highlighted in yellow.</i></td></tr></table><br><br>\n";
+		}
+		if ($gamesfrozen == 1) {
+			$boxContent .= "$gamesfrozen - One of your games is past the pick deadline, your pick is marked with an \"*\".<br><br>\n";
+		} elseif ($gamesfrozen > 1) {
+			$boxContent .= "Some of your games is past the pick deadline, your pick is marked with an \"*\".<br><br>\n";
+		}
+		if ($withoutspreads > 0) {
+			$boxContent .= "As soon as the Spreads are posted, You'll have the chance to pick your team.<br><br>\n";
+		}
+	}
+}
