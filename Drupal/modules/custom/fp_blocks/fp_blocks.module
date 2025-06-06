@@ -1,0 +1,14 @@
+<?php
+/**
+ * @file
+ * Hook implementations for the FP Blocks module.
+ */
+
+/**
+ * Implements hook_help().
+ */
+function fp_blocks_help($route_name, \Drupal\Core\Routing\RouteMatchInterface $route_match) {
+  if ($route_name == 'help.page.fp_blocks') {
+    return t('Provides various blocks including schedules, leaders, coaches and the bowl challenge.');
+  }
+}

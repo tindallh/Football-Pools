@@ -1,0 +1,5 @@
+name: 'FP Picks NCAA Top 25'
+type: module
+description: 'Allows users to enter picks for NCAA Top 25 games.'
+core_version_requirement: ^8 || ^9 || ^10
+package: 'Football Pools'

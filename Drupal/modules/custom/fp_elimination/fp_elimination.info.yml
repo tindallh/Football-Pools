@@ -1,0 +1,5 @@
+name: 'FP Elimination Pools'
+type: module
+description: 'Manages elimination pools for NCAA and NFL.'
+core_version_requirement: ^8 || ^9 || ^10
+package: 'Football Pools'

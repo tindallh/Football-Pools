@@ -1,0 +1,5 @@
+name: 'FP Blocks'
+type: module
+description: 'Provides blocks for schedules, leaders, coaches and bowl challenge.'
+core_version_requirement: ^8 || ^9 || ^10
+package: 'Football Pools'

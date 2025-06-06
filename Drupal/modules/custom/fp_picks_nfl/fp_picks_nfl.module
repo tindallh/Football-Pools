@@ -1,0 +1,22 @@
+<?php
+/**
+ * @file
+ * Hooks for the FP Picks NFL module.
+ */
+
+use Drupal\Core\Form\FormStateInterface;
+
+function fp_picks_nfl_help($route_name, \Drupal\Core\Routing\RouteMatchInterface $route_match) {
+  switch ($route_name) {
+    case 'help.page.fp_picks_nfl':
+      return t('Provides forms for entering NFL football picks.');
+  }
+  return NULL;
+}
+
+function fp_picks_nfl_picks_form(array $form, FormStateInterface $form_state) {
+  $form['message'] = [
+    '#markup' => t('This form will allow users to enter NFL picks.'),
+  ];
+  return $form;
+}
