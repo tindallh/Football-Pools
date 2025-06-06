@@ -1,0 +1,22 @@
+<?php
+/**
+ * @file
+ * Hooks for the FP Schedule module.
+ */
+
+use Drupal\Core\Form\FormStateInterface;
+
+function fp_schedule_help($route_name, \Drupal\Core\Routing\RouteMatchInterface $route_match) {
+  switch ($route_name) {
+    case 'help.page.fp_schedule':
+      return t('Provides administration of NCAA and NFL schedules.');
+  }
+  return NULL;
+}
+
+function fp_schedule_admin_form(array $form, FormStateInterface $form_state) {
+  $form['message'] = [
+    '#markup' => t('This form will be used to manage schedules.'),
+  ];
+  return $form;
+}

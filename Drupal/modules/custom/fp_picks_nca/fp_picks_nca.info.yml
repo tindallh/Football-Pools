@@ -1,0 +1,5 @@
+name: 'FP Picks NCAA'
+type: module
+description: 'Allows users to enter NCAA pool picks.'
+core_version_requirement: ^8 || ^9 || ^10
+package: 'Football Pools'

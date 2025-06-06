@@ -1,0 +1,28 @@
+<?php
+/**
+ * @file
+ * Hooks and callbacks for the FP Picks NCAA module.
+ */
+
+use Drupal\Core\Form\FormStateInterface;
+
+/**
+ * Implements hook_help().
+ */
+function fp_picks_nca_help($route_name, \Drupal\Core\Routing\RouteMatchInterface $route_match) {
+  switch ($route_name) {
+    case 'help.page.fp_picks_nca':
+      return t('Provides forms for entering NCAA football picks.');
+  }
+  return NULL;
+}
+
+/**
+ * Placeholder form for entering picks.
+ */
+function fp_picks_nca_picks_form(array $form, FormStateInterface $form_state) {
+  $form['message'] = [
+    '#markup' => t('This form will allow users to enter NCAA picks.'),
+  ];
+  return $form;
+}

@@ -1,0 +1,5 @@
+name: 'FP Schedule'
+type: module
+description: 'Manages NCAA and NFL schedules.'
+core_version_requirement: ^8 || ^9 || ^10
+package: 'Football Pools'

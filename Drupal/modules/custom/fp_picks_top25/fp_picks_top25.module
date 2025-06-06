@@ -1,0 +1,22 @@
+<?php
+/**
+ * @file
+ * Hooks for the FP Picks NCAA Top 25 module.
+ */
+
+use Drupal\Core\Form\FormStateInterface;
+
+function fp_picks_top25_help($route_name, \Drupal\Core\Routing\RouteMatchInterface $route_match) {
+  switch ($route_name) {
+    case 'help.page.fp_picks_top25':
+      return t('Provides forms for entering picks for NCAA Top 25 games.');
+  }
+  return NULL;
+}
+
+function fp_picks_top25_picks_form(array $form, FormStateInterface $form_state) {
+  $form['message'] = [
+    '#markup' => t('This form will allow users to enter picks for NCAA Top 25 games.'),
+  ];
+  return $form;
+}
